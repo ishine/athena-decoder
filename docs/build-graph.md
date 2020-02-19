@@ -8,21 +8,23 @@ which uses [Openfst Python extension](http://www.openfst.org/twiki/bin/view/FST/
 The building steps and data-preparation scripts are reference to [Kaldi](http://kaldi-asr.org/).
 
 Three data file are necessary for decoding graph creation:
-- character table file which contains all characters and corresponding index
-- speller file which spell word to its character sequence
-- language model in ARPA format
+- grapheme table file which contains all grapheme and corresponding index (usually graphemes.txt)
+- lexicon file which contains the map from word to its grapheme sequence (usually lexicon.txt)
+- language model in ARPA format (usually lm.arpa)
 
 There will be three output file:
-- new character table file contains disambiguation symbols and epsilon 
-- word table file which contains all words and corresponding index the decoding graph
+- new grapheme table file contains disambiguation symbols and epsilon (usually graphemes_disambig.txt) 
+- word table file which contains all words and corresponding index (usually words.txt)
+- the decoding graph (LG.fst or TLG.fst)
 
-# Preparing character table file
+# Preparing grapheme table file
 
-We need to prepare the OpenFst input symbol table characters.txt. The table assign integer index to all the characters in system.
-Actually, the character file is the same as the vocab file used in Seq2Seq model. An example of how the character table file look like is:
+We need to prepare the OpenFst input symbol table from "grapheme.txt". The table assigns integer index to all the graphemes in system. Actually, the "grapheme.txt" file is the same as the vocab file used in Seq2Seq model. 
+
+If the grapheme is character in Chinese, the example of how the grapheme table file looks like:
 
 ```
-## head characters.txt
+## head graphemes.txt
 <unk> 0
 一 1
 丁 2
@@ -34,7 +36,7 @@ Actually, the character file is the same as the vocab file used in Seq2Seq model
 下 8
 不 9
 
-## tail characters.txt
+## tail graphemes.txt
 r 3640
 s 3641
 t 3642
@@ -47,14 +49,101 @@ z 3648
 <space> 3649
 ```
 
-A new character table file which contains disambiguation symbols and epsilon will be produced later.
+A new grapheme table file which contains disambiguation symbols and epsilon will be produced later. The
+generated table file is the input table file for the decoding graph. 
+An example of how the input table file looks like:
 
-# Preparing the speller S
-
-If you are familiar with WFST or ASR system, the speller file plays the role of lexicon. In Seq2Seq ASR system such as LAS and Transformer, the modeling unit is
-always character. All words are mapped to its character sequence just like spell it. That is why we call it speller file. A small part of the speller file is:
 ```
-## head speller.txt
+## head graphemes_disambig.txt
+<eps> 0
+<unk> 1
+一 2
+丁 3
+七 4
+万 5
+丈 6
+三 7
+上 8
+下 9
+
+## tail graphemes_disambig.txt
+u 3644
+v 3645
+w 3646
+x 3647
+y 3648
+z 3649
+<space> 3650
+#0 3651
+#1 3652
+#2 3653
+......
+```
+When building the "TLG" type graph for CTC model and the grapheme is syllables, the "graphemes.txt" and "graphemes_disambig.txt" files look like:
+
+```
+## head graphemes.txt
+
+SIL 0
+h_T0#ao_T4 1
+ii_T0#iao_T1 2
+ii_T0#iao_T2 3
+ii_T0#iao_T3 4
+ii_T0#iao_T4 5
+h_T0#ai_T4 6
+s_T0#an_T4 7
+z_T0#ai_T4 8
+ch_T0#eng_T4 9
+
+## tail graphemes.txt
+
+t_T0#a_T2 1304
+x_T0#van_T4 1305
+x_T0#van_T3 1306
+x_T0#van_T2 1307
+x_T0#van_T1 1308
+g_T0#u_T1 1309
+g_T0#u_T2 1310
+g_T0#u_T3 1311
+g_T0#u_T4 1312
+<blk> 1313
+
+```
+What you have to pay attention is that the "graphemes.txt" should contain blank symbols "\<blk\>"(usually is the last symbol) for "TLG" type graph.
+```
+## head graphemes_disambig.txt
+<eps> 0
+SIL 1
+h_T0#ao_T4 2
+ii_T0#iao_T1 3
+ii_T0#iao_T2 4
+ii_T0#iao_T3 5
+ii_T0#iao_T4 6
+h_T0#ai_T4 7
+s_T0#an_T4 8
+z_T0#ai_T4 9
+
+## tail graphemes_disambig.txt
+
+g_T0#u_T1 1310
+g_T0#u_T2 1311
+g_T0#u_T3 1312
+g_T0#u_T4 1313
+<blk> 1314
+#0 1315
+#1 1316
+......
+
+```
+
+
+# Preparing the lexicon L
+
+In lexicon file "lexicon.txt", all words are mapped to its grapheme sequence. The lexicon file shows how to spell or pronounce
+a word.
+An example looks like:
+```
+## head lexicon.txt
 <unk> <unk>
 一丝不挂 一 丝 不 挂
 一个人的旅行 一 个 人 的 旅 行
@@ -66,7 +155,7 @@ always character. All words are mapped to its character sequence just like spell
 一前一后 一 前 一 后
 一千五百多 一 千 五 百 多
 
-## tail speller.txt
+## tail lexicon.txt
 鼻尖 鼻 尖
 齐姐 齐 姐
 龌 龌
@@ -78,15 +167,60 @@ always character. All words are mapped to its character sequence just like spell
 龙阳 龙 阳
 
 ```
+If the grapheme is syllable, the lexicon looks like:
+```
+## head lexicon.txt
+!SIL SIL
+<unk> SIL
+0 l_T0#ing_T2
+1 ii_T0#i_T1
+1 ii_T0#iao_T1
+2 ee_T0#er_T2
+2 ee_T0#er_T4
+3 s_T0#an_T1
+4 s_T0#iy_T4
+5 uu_T0#u_T3
 
-According to the character table file and speller file, the word table file and new character table file will be produced.
+
+## tail lexicon.txt
+鼬樱 ii_T0#iu_T4 ii_T0#ing_T1
+鼬佐 ii_T0#iu_T4 z_T0#uo_T3
+鼯 uu_T0#u_T2
+鼹 ii_T0#ian_T3
+鼹鼠 ii_T0#ian_T3 sh_T0#u_T3
+鼷 x_T0#i_T1
+鼽 q_T0#iu_T2
+鼾 h_T0#an_T1
+鼾声 h_T0#an_T1 sh_T0#eng_T1
+齄 zh_T0#a_T1
+```
+
+According to the grapheme table file and lexicon file, the word table file (words.txt) and disambiguation grapheme file (graphemes_disambig.txt) will be produced.
 
 ```
-speller_builder = SpellerBuilder()
-S = self.speller_builder('speller.txt', 'characters.txt')
-speller_builder.write_words_table('words.txt')
-speller_builder.write_disambig_chars_table('characters_disambig.txt')
-S.write('S.fst')
+## head words.txt
+<eps> 0
+<unk> 1
+一丝不挂 2
+一个人的旅行 3
+一个孩子 4
+一个窗口 5
+一二星座 6
+一传 7
+一凡 8
+一前一后 9
+
+## tail words.txt
+龙南 3470
+龙宝 3471
+龙桥 3472
+龙玉 3473
+龙舟 3474
+龙阳 3475
+龟头炎 3476
+#0 3477
+<s> 3478
+</s> 3479
 
 ```
 
@@ -108,27 +242,48 @@ During buiding process, these operation have be done:
 - sort the arc for every state in G according the input label index
 
 
-# Preparing decoding graph SG
 
-After Creating the speller graph S and grammar graph G, we could use WFST compose algorithm to build decoding graph SG. Then the decoding graph SG can be 
-optimized by determinization and minimization. Additional steps we have to do are as follows:
-- remove the arc whose output label is unk
+# Preparing decoding graph LG
+
+After Creating the lexicon graph L and grammar graph G, we could use WFST compose algorithm to build decoding graph LG. Then the decoding graph LG could be 
+optimized by determinization and minimization argorithms. Additional steps we have to do are as follows:
+- remove the arc whose output label is "\<unk\>"
 - replace all the disambiguation symbols with epsilon
 
+After all these steps, we get the decoding graph LG
+
+
+# Preparing decoding graph TLG
+
+To build decoding graph "TLG" for CTC model, we need to create another WFST called T. The usage of T is compressing CTC sequences,
+deleting blank symbols and removing duplicate symbols.
+
+### Preparing the T
+
+The function of T is deleting blank symbols and removing duplicate symbols. That is necessary for CTC model.
+For example, There is a symbol sequence:
 ```
-SG = fst.compose(S, G)
-SG = fst.determinize(SG)
-SG.minimize()
-SG.arcsort(sort_type='ilabel')
-remove_unk_arc()
-remove_disambig_symbol()
-SG.arcsort(sort_type='ilabel')
-SG.write('SG.fst')
+a a a <blk> b b <blk> b <blk>
+```
+After the process of T, the output sequence would be:
+```
+a b b
+```
+When building the T, we will map disambiguation symbols and blank symbol to epsilon. So There is no need to 
+remove disambiguation symbols for "TLG" graph.
+
+
+
+### Creating graph TLG
+
+Eventually, we could build the decoding graph for CTC model by the Openfst composition algorithm.
+Then we could  optimize the graph using determinization and minimization algorithm.
+
+In summary, the creation of decoding graph would be:
 
 ```
-After all these steps, we get the decoding graph SG
-
-
+TLG = comp(T,min(deter(LG)))
+```
 
 
 
