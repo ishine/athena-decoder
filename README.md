@@ -22,19 +22,33 @@ python setup.py bdist_wheel sdist
 python -m pip install --ignore-installed dist/pydecoders-0.1.0*.whl
 source ./tools/env.sh
 ```
-## Example
+## Build Graph
+1. Build graph for HKUST
+```bash
+python pydecoders/build_graph_main.py examples/hkust/conf/hkust.conf
+```
+2. Build graph for AISHELL
+```bash
+# prepare data
+cd examples/aishell && ./prepare_data.sh
+# build graph
+python pydecoders/build_graph_main.py examples/aishell/conf/aishell.conf
+```
+
+
+## Decode
 1. WFST-based Decoder
 ```bash
 # first build WFST graph,optional
 # or you can skip this build step and use graph in hkust/graph directly 
 python pydecoders/build_graph_main.py
 # run decode step
-python pydecoders/decode_wfst_main.py
+python pydecoders/decode_wfst_main.py examples/hkust/conf/hkust.conf
 ```
 2. Beam-Search decoder
-```batch
+```bash
 # run beam search decoder 
-python pydecoders/decode_beam_search_main.py
+python pydecoders/decode_beam_search_main.py examples/hkust/conf/hkust.conf
 ```
 3. ArgMax decoder
 + modify the max_active parameter to 1 in BeamSearch decoder
